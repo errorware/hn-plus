@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         HN+
 // @namespace    https://github.com/errorware/hn-plus
-// @version      0.2.0
+// @version      0.3.0
 // @description  A dark, configurable power-user layer for Hacker News.
 // @homepageURL  https://github.com/errorware/hn-plus
 // @supportURL   https://github.com/errorware/hn-plus/issues
@@ -20,7 +20,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '0.2.0';
+  const VERSION = '0.3.0';
   const API = 'https://hacker-news.firebaseio.com/v0';
 
   /* =====================================================================
@@ -88,6 +88,13 @@
     // account
     accountMenu: true,
     replyTracking: true,
+    // christmas
+    xmas: 'off',            // off | on | auto (1 Dec - 6 Jan)
+    xmasSnow: true,
+    xmasSnowAmount: 'medium', // light | medium | blizzard
+    xmasHats: true,
+    xmasOrnaments: true,
+    xmasLights: true,
     // word swaps: [{ from, to }]
     swaps: [],
     swapStyle: 'shine', // shine | glow | squiggle | marker | none
@@ -642,6 +649,185 @@ html.hnp .pagetop a.hnp-gear:link, html.hnp .pagetop a.hnp-gear:visited { color:
     (document.head || document.documentElement).append(l);
   }
 
+  /* =====================================================================
+   * Christmas mode: snow, Santa hats, title ornaments, fairy lights
+   * ===================================================================== */
+
+  function isXmas() {
+    if (S.xmas === 'on') return true;
+    if (S.xmas !== 'auto') return false;
+    const d = new Date();
+    return d.getMonth() === 11 || (d.getMonth() === 0 && d.getDate() <= 6);
+  }
+
+  const svgUrl = (svg) => `url("data:image/svg+xml,${encodeURIComponent(svg.replace(/\s+/g, ' ').trim())}")`;
+  const X_RED = '#e5383b', X_GREEN = '#22a559', X_GOLD = '#fbbf24', X_SNOW = '#f8f8f8';
+
+  const SANTA_HAT = svgUrl(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 28">
+    <path d="M5 21 C7 11 14 4 25 5 C27 5.3 28.5 6.5 28 8 C24 9 21.5 14 23 21 Z" fill="${X_RED}"/>
+    <path d="M14 8 C18 5.5 22 5 25 5.4 C21.5 6.5 18.5 9 17 12 Z" fill="#ff6b6b" opacity=".55"/>
+    <rect x="2" y="18.5" width="24" height="7.5" rx="3.75" fill="${X_SNOW}"/>
+    <rect x="4" y="19.5" width="20" height="2" rx="1" fill="#ffffff"/>
+    <circle cx="28" cy="8.5" r="3.6" fill="${X_SNOW}"/>
+  </svg>`);
+
+  const ORNAMENTS = {
+    holly: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">
+      <path d="M8 9 C5 9 2.5 7.5 1 4.5 C2.5 4.8 3.2 4 3.5 3 C4.5 4 5.8 4.2 6.5 3.5 C6.8 5.5 7.6 7.5 8 9 Z" fill="${X_GREEN}"/>
+      <path d="M8 9 C11 9 13.5 7.5 15 4.5 C13.5 4.8 12.8 4 12.5 3 C11.5 4 10.2 4.2 9.5 3.5 C9.2 5.5 8.4 7.5 8 9 Z" fill="#1c8a4a"/>
+      <circle cx="6.6" cy="10.6" r="2" fill="${X_RED}"/><circle cx="9.6" cy="10.6" r="2" fill="${X_RED}"/><circle cx="8.1" cy="12.9" r="2" fill="#c81d25"/>
+    </svg>`,
+    bauble: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">
+      <path d="M8 .8 C9.4 .8 9.4 2.6 8 2.6" fill="none" stroke="${X_GOLD}" stroke-width=".9"/>
+      <rect x="6.2" y="2.4" width="3.6" height="2.2" rx=".6" fill="${X_GOLD}"/>
+      <circle cx="8" cy="10" r="5.6" fill="${X_RED}"/>
+      <path d="M2.8 9.2 C5 10.6 11 10.6 13.2 9.2" fill="none" stroke="${X_GOLD}" stroke-width=".9"/>
+      <circle cx="5.9" cy="7.9" r="1.4" fill="#fff" opacity=".55"/>
+    </svg>`,
+    star: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">
+      <path d="M8 .9 L10.1 5.6 L15.2 6.1 L11.4 9.5 L12.5 14.6 L8 12 L3.5 14.6 L4.6 9.5 L.8 6.1 L5.9 5.6 Z" fill="${X_GOLD}" stroke="#f59e0b" stroke-width=".6" stroke-linejoin="round"/>
+      <path d="M8 3.2 L9.2 6.2 L8 8.6 Z" fill="#fff" opacity=".5"/>
+    </svg>`,
+    gift: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">
+      <path d="M8 4.6 C6.5 1.6 3.6 2.2 4.6 4.4 M8 4.6 C9.5 1.6 12.4 2.2 11.4 4.4" fill="none" stroke="${X_GOLD}" stroke-width="1.2" stroke-linecap="round"/>
+      <rect x="1.6" y="4.6" width="12.8" height="3.4" rx=".7" fill="#c81d25"/>
+      <rect x="2.6" y="8" width="10.8" height="7" rx=".7" fill="${X_RED}"/>
+      <rect x="7" y="4.6" width="2" height="10.4" fill="${X_GOLD}"/>
+    </svg>`,
+    cane: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">
+      <path d="M10 15 V6 A3.2 3.2 0 0 0 3.6 6" fill="none" stroke="${X_SNOW}" stroke-width="2.6" stroke-linecap="round"/>
+      <path d="M10 15 V6 A3.2 3.2 0 0 0 3.6 6" fill="none" stroke="${X_RED}" stroke-width="2.6" stroke-dasharray="1.8 1.8"/>
+    </svg>`,
+    bell: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">
+      <path d="M8 1.6 C5 1.6 3.8 4 3.8 7 C3.8 9.6 3 11 1.8 12.2 H14.2 C13 11 12.2 9.6 12.2 7 C12.2 4 11 1.6 8 1.6 Z" fill="${X_GOLD}" stroke="#d99a06" stroke-width=".6"/>
+      <circle cx="8" cy="13.4" r="1.6" fill="#d99a06"/>
+      <path d="M5.6 4.4 C5 5.4 4.9 6.6 5 7.6" fill="none" stroke="#fff" stroke-width=".9" opacity=".6" stroke-linecap="round"/>
+      <path d="M6.6 1.2 L8 2.6 L9.4 1.2" fill="none" stroke="${X_GREEN}" stroke-width="1.1"/>
+    </svg>`,
+  };
+  // start / end ornament per row, cycled by data-hnp-xo
+  const ORNAMENT_PAIRS = [['holly', 'bauble'], ['star', 'gift'], ['cane', 'bell'], ['bauble', 'holly'], ['gift', 'star'], ['bell', 'cane']];
+
+  const XMAS_CSS = `
+/* Santa hats */
+html.hnp-xmas-hats a.hnp-user, html.hnp-xmas-hats #me { position: relative; margin-right: 5px; }
+html.hnp-xmas-hats a.hnp-user::after, html.hnp-xmas-hats #me::after {
+  content: ""; position: absolute; right: -11px; top: -.85em; width: 1.45em; height: 1.25em; pointer-events: none;
+  background: ${SANTA_HAT} no-repeat center / contain; transform: rotate(22deg); filter: drop-shadow(0 1px 1px rgba(0,0,0,.45));
+}
+/* Title ornaments */
+html.hnp-xmas-orn .titleline::before, html.hnp-xmas-orn .titleline > a::after {
+  content: ""; display: inline-block; width: 1em; height: 1em; vertical-align: -.14em; background: no-repeat center / contain;
+}
+html.hnp-xmas-orn .titleline::before { margin-right: .4em; }
+html.hnp-xmas-orn .titleline > a::after { margin-left: .4em; }
+${ORNAMENT_PAIRS.map(([a, b], i) => `html.hnp-xmas-orn .titleline[data-hnp-xo="${i}"]::before { background-image: ${svgUrl(ORNAMENTS[a])}; }
+html.hnp-xmas-orn .titleline[data-hnp-xo="${i}"] > a::after { background-image: ${svgUrl(ORNAMENTS[b])}; }`).join('\n')}
+/* Fairy lights under the header */
+html.hnp-xmas-lights #hnmain > tbody > tr:first-child > td { position: relative; }
+html.hnp-xmas-lights #hnmain > tbody > tr:first-child > td::before,
+html.hnp-xmas-lights #hnmain > tbody > tr:first-child > td::after {
+  content: ""; position: absolute; left: 16px; right: 16px; bottom: -6px; height: 10px; pointer-events: none;
+  animation: hnp-twinkle 2.6s ease-in-out infinite;
+}
+html.hnp-xmas-lights #hnmain > tbody > tr:first-child > td::before {
+  background:
+    radial-gradient(circle at 6px 5px, ${X_RED} 0 2.6px, transparent 3.2px) 0 0 / 48px 10px repeat-x,
+    radial-gradient(circle at 30px 5px, ${X_GOLD} 0 2.6px, transparent 3.2px) 0 0 / 48px 10px repeat-x;
+  filter: drop-shadow(0 0 3px rgba(255, 190, 120, .7));
+}
+html.hnp-xmas-lights #hnmain > tbody > tr:first-child > td::after {
+  background:
+    radial-gradient(circle at 18px 5px, #34d17a 0 2.6px, transparent 3.2px) 0 0 / 48px 10px repeat-x,
+    radial-gradient(circle at 42px 5px, #60a5fa 0 2.6px, transparent 3.2px) 0 0 / 48px 10px repeat-x;
+  filter: drop-shadow(0 0 3px rgba(140, 200, 255, .7));
+  animation-delay: -1.3s;
+}
+@keyframes hnp-twinkle { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+/* Snow */
+.hnp-snow { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 2147480000; }
+@media (prefers-reduced-motion: reduce) {
+  html.hnp-xmas-lights #hnmain > tbody > tr:first-child > td::before,
+  html.hnp-xmas-lights #hnmain > tbody > tr:first-child > td::after { animation: none; }
+}
+`;
+
+  // ---- snow: one canvas, a few hundred dots at most, paused when the tab is hidden
+  const SNOW_DENSITY = { light: 26000, medium: 12000, blizzard: 4500 }; // px² of viewport per flake
+  let snow = null;
+
+  function startSnow() {
+    if (snow || !document.body) return;
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+    const canvas = h('canvas', { class: 'hnp-snow', 'aria-hidden': 'true' });
+    document.body.append(canvas);
+    const ctx = canvas.getContext('2d');
+    const st = { canvas, raf: 0, flakes: [], w: 0, h: 0, last: 0 };
+    const resize = () => {
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      st.w = window.innerWidth;
+      st.h = window.innerHeight;
+      canvas.width = Math.round(st.w * dpr);
+      canvas.height = Math.round(st.h * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    };
+    const flake = (fromTop) => {
+      const r = 0.7 + Math.random() ** 2 * 2.8; // mostly small, a few big ones
+      return {
+        x: Math.random() * st.w, y: fromTop ? -6 - Math.random() * 40 : Math.random() * st.h,
+        r, vy: 0.35 + r * 0.32 + Math.random() * 0.35, sway: 0.2 + Math.random() * 0.6,
+        ph: Math.random() * Math.PI * 2, freq: 0.6 + Math.random() * 1.2, o: 0.35 + Math.random() * 0.55,
+      };
+    };
+    const frame = (t) => {
+      const k = st.last ? Math.min(3, (t - st.last) / 16.7) : 1;
+      st.last = t;
+      const want = Math.round((st.w * st.h) / (SNOW_DENSITY[S.xmasSnowAmount] || SNOW_DENSITY.medium));
+      while (st.flakes.length < want) st.flakes.push(flake(st.ready)); // first fill spreads over the screen
+      st.ready = true;
+      if (st.flakes.length > want) st.flakes.length = want;
+      ctx.clearRect(0, 0, st.w, st.h);
+      ctx.fillStyle = '#ffffff';
+      const time = t / 1000;
+      for (const f of st.flakes) {
+        f.y += f.vy * k;
+        f.x += Math.sin(time * f.freq + f.ph) * f.sway * k * 0.6;
+        if (f.y > st.h + 6 || f.x < -10 || f.x > st.w + 10) Object.assign(f, flake(true));
+        ctx.globalAlpha = f.o;
+        ctx.beginPath();
+        ctx.arc(f.x, f.y, f.r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      st.raf = requestAnimationFrame(frame);
+    };
+    st.onResize = resize;
+    st.onVis = () => {
+      cancelAnimationFrame(st.raf);
+      st.last = 0;
+      if (document.visibilityState === 'visible') st.raf = requestAnimationFrame(frame);
+    };
+    window.addEventListener('resize', resize);
+    document.addEventListener('visibilitychange', st.onVis);
+    resize();
+    st.raf = requestAnimationFrame(frame);
+    snow = st;
+  }
+
+  function stopSnow() {
+    if (!snow) return;
+    cancelAnimationFrame(snow.raf);
+    window.removeEventListener('resize', snow.onResize);
+    document.removeEventListener('visibilitychange', snow.onVis);
+    snow.canvas.remove();
+    snow = null;
+  }
+
+  function applyXmas() {
+    if (!document.body) return;
+    if (isXmas() && S.xmasSnow) startSnow(); else stopSnow();
+    $$('.titleline').forEach((t, i) => { if (t.dataset.hnpXo == null) t.dataset.hnpXo = String(i % ORNAMENT_PAIRS.length); });
+  }
+
   const HTML_FLAGS = {
     'hnp-sticky': () => S.stickyHeader,
     'hnp-rails': () => S.rails,
@@ -655,6 +841,10 @@ html.hnp .pagetop a.hnp-gear:link, html.hnp .pagetop a.hnp-gear:visited { color:
     'hnp-newcounts': () => S.newCountBadge,
     'hnp-dimread': () => S.dimRead,
     'hnp-filter-dim': () => S.filterMode === 'dim',
+    'hnp-xmas': () => isXmas(),
+    'hnp-xmas-hats': () => isXmas() && S.xmasHats,
+    'hnp-xmas-orn': () => isXmas() && S.xmasOrnaments,
+    'hnp-xmas-lights': () => isXmas() && S.xmasLights,
   };
 
   function applyTheme() {
@@ -665,7 +855,9 @@ html.hnp .pagetop a.hnp-gear:link, html.hnp .pagetop a.hnp-gear:visited { color:
     root.classList.add(`hnp-swapfx-${S.swapStyle || 'shine'}`);
     mountStyle('hnp-base', CSS_BASE);
     mountStyle('hnp-vars', themeVars());
+    mountStyle('hnp-xmas', XMAS_CSS);
     ensureFontLink();
+    applyXmas();
   }
 
   // Paint the dark theme before HN renders anything (no white flash).
@@ -1745,6 +1937,13 @@ html.hnp .pagetop a.hnp-gear:link, html.hnp .pagetop a.hnp-gear:visited { color:
         section('Layout',
           segmented('width', 'Page width', null, [['readable', 'Readable'], ['classic', 'Classic 85%'], ['full', 'Full']]),
           toggle('stickyHeader', 'Sticky header', 'Keep the top bar visible while scrolling')),
+        section('Christmas mode \u2744',
+          segmented('xmas', 'Christmas mode', '"December" switches it on from 1 Dec to 6 Jan, then off again', [['off', 'Off'], ['on', 'On'], ['auto', 'December']]),
+          toggle('xmasSnow', 'Snow', 'Paused in background tabs; off when your system asks for reduced motion'),
+          segmented('xmasSnowAmount', 'Snowfall', null, [['light', 'Light'], ['medium', 'Medium'], ['blizzard', 'Blizzard']]),
+          toggle('xmasHats', 'Santa hats', 'A tipped hat on every username'),
+          toggle('xmasOrnaments', 'Title ornaments', 'Holly, baubles, stars, gifts, candy canes and bells around story titles'),
+          toggle('xmasLights', 'Fairy lights', 'Twinkling lights along the header')),
       ];
     },
 

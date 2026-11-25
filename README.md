@@ -35,6 +35,7 @@ HN+ is a single userscript. It gives Hacker News a deep dark theme with an accen
   - Filter stories by keyword, regex or domain.
   - Optional site icons.
 - **Word swaps:** replace any word everywhere, for example `rust → crust`. Matching is whole-word and ignores case, and the replacement copies the original's capitalisation. Swapped words get a subtle flair: shine, glow, squiggle or marker.
+- **Christmas mode ❄:** falling snow, a Santa hat on every username, ornaments around story titles, and fairy lights under the header. Each part can be switched on or off. Set it to **December** and it runs from 1 Dec to 6 Jan by itself.
 - **Backup:** export and import your whole setup as JSON.
 
 ### Keyboard
