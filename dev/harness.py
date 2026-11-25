@@ -12,6 +12,7 @@ Snapshots live in dev/pages/ (git-ignored).
 Add ?demo to any page to seed sample state (users, a word swap, NEW
 comments); ?demo=settings also opens the settings panel and ?demo=card
 opens a user hover card. Used for the README screenshots.
+Add ?me=<username> to fake being logged in as that user (account menu, replies).
 """
 import http.server
 import json
@@ -103,6 +104,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
             query = dict(q.split('=', 1) if '=' in q else (q, '') for q in self.path.partition('?')[2].split('&') if q)
             demo = demo_script(query['demo']) if 'demo' in query else ''
             html = html[:i] + demo + SHIM + html[i:]
+            if 'me' in query:  # pretend to be logged in as ?me=<username>
+                me = re.sub(r'[^\w-]', '', query['me'])
+                html = re.sub(r'<a href="login\?goto=[^"]*">login</a>',
+                              f'<a id="me" href="user?id={me}">{me}</a> (<span id="karma">1234</span>) | '
+                              '<a id="logout" rel="nofollow" href="logout?auth=0&amp;goto=news">logout</a>', html)
             # HN's own assets resolve against the real site
             for attr, asset in (('href', 'news.css'), ('src', 'hn.js'), ('src', 'y18.svg'), ('src', 's.gif')):
                 html = html.replace(f'{attr}="{asset}', f'{attr}="{HN}/{asset}')

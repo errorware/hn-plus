@@ -22,6 +22,8 @@ HN+ is a single userscript. It gives Hacker News a deep dark theme with an accen
 - **Theme:** four near-black bases (Abyss, Graphite, Ash, OLED). Every tone and the accent colour can be edited. It loads before the page draws, so there's no white flash.
 - **Typography:** Sans, Serif, Mono ([JetBrains Mono](https://www.jetbrains.com/lp/mono/)) or classic Verdana. Text size, line height and page width are adjustable.
 - **People:** hover a username for their karma and bio, plus your **private notes**. From the same card you can give them an **alias**, a tag, a highlight colour, or mute them.
+- **Account menu:** when you're logged in, hover your username for one-hop access to your comments, submissions, upvoted and favorite stories and comments, hidden, flagged, change password and logout.
+- **Reply tracking:** a badge next to your name counts new replies to your recent posts. The menu lists them with a snippet and what they replied to.
 - **Threads:**
   - Comments posted since your last visit are marked **NEW**, with a toolbar to jump between them.
   - Comments by the story's author get an **OP** badge.
@@ -50,7 +52,7 @@ HN+ is a single userscript. It gives Hacker News a deep dark theme with an accen
 ## Privacy
 
 Everything you set stays in your userscript manager's local storage. Besides HN itself, the script connects only to:
-- the official [HN API](https://github.com/HackerNews/API), for hover cards
+- the official [HN API](https://github.com/HackerNews/API), for hover cards and reply checks (your last 30 posts, every few minutes, only while logged in)
 - Google Fonts, for JetBrains Mono
 - DuckDuckGo's icon service, only if site icons are on
 - image hosts, only when you expand an image
@@ -60,4 +62,4 @@ Everything you set stays in your userscript manager's local storage. Besides HN 
 The whole script is [`hn-plus.user.js`](hn-plus.user.js). There's no build step.
 
 - **Live editing:** install [`dev/hn-plus.dev.user.js`](dev/hn-plus.dev.user.js) and set its `@require` path to your clone. Saved changes apply on page reload.
-- **Offline testing:** `python3 dev/harness.py` serves real HN snapshots with the script injected at `localhost:8765`. Add `?demo` to a URL to load sample data.
+- **Offline testing:** `python3 dev/harness.py` serves real HN snapshots with the script injected at `localhost:8765`. Add `?demo` to a URL to load sample data, or `?me=<username>` to fake being logged in.

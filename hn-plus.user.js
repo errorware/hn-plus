@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         HN+
 // @namespace    https://github.com/errorware/hn-plus
-// @version      0.1.0
+// @version      0.2.0
 // @description  A dark, configurable power-user layer for Hacker News.
 // @homepageURL  https://github.com/errorware/hn-plus
 // @supportURL   https://github.com/errorware/hn-plus/issues
@@ -20,7 +20,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '0.1.0';
+  const VERSION = '0.2.0';
   const API = 'https://hacker-news.firebaseio.com/v0';
 
   /* =====================================================================
@@ -85,6 +85,9 @@
     filterDomains: '',
     // behaviour
     keyboard: true,
+    // account
+    accountMenu: true,
+    replyTracking: true,
     // word swaps: [{ from, to }]
     swaps: [],
     swapStyle: 'shine', // shine | glow | squiggle | marker | none
@@ -214,7 +217,8 @@
    * ===================================================================== */
 
   const apiCache = new Map();
-  function api(path) {
+  function api(path, fresh) {
+    if (fresh) apiCache.delete(path);
     if (apiCache.has(path)) return apiCache.get(path);
     const url = `${API}/${path}.json`;
     const p = new Promise((resolve, reject) => {
@@ -444,6 +448,36 @@ html.hnp .hnp-noteicon { color: var(--hnp-accent); margin-left: 3px; font-size: 
 .hnp-urow-top > a { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hnp-ui .hnp-urow textarea { margin-top: 6px; min-height: 40px; font-family: var(--hnp-font); font-size: 12.5px; }
 
+/* ---------- account menu & replies ---------- */
+html.hnp .pagetop a.hnp-replybadge:link, html.hnp .pagetop a.hnp-replybadge:visited { display: inline-block; min-width: 16px; padding: 0 5px; margin-left: 5px; border-radius: 999px; background: var(--hnp-accent); color: var(--hnp-ink) !important; font-size: .78em; font-weight: 800; line-height: 1.5; text-align: center; cursor: pointer; vertical-align: 1px; }
+.hnp-card.hnp-acct { width: min(400px, 94vw); max-height: min(78vh, 640px); padding: 0; overflow: hidden; display: flex; flex-direction: column; }
+.hnp-acct-head { display: flex; align-items: baseline; gap: 8px; padding: 12px 14px 10px; border-bottom: 1px solid var(--hnp-border); }
+.hnp-acct-head b { font-size: 15px; color: var(--hnp-text); }
+.hnp-acct-head .hnp-card-karma { font-size: 12px; }
+.hnp-acct-head .hnp-acct-tools { margin-left: auto; display: flex; gap: 6px; }
+.hnp-acct-head button { background: none; border: 1px solid var(--hnp-border); color: var(--hnp-dim); border-radius: 6px; padding: 1px 8px; cursor: pointer; font-size: 12px; }
+.hnp-acct-head button:hover { color: var(--hnp-accent); border-color: var(--hnp-accent); }
+.hnp-acct-replies { overflow: auto; flex: 1 1 auto; min-height: 0; }
+.hnp-acct-label { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px 4px; font-size: 10.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--hnp-muted); }
+.hnp-acct-label span { color: var(--hnp-accent); }
+a.hnp-reply:link, a.hnp-reply:visited { display: block; padding: 8px 14px 9px; color: var(--hnp-dim); border-left: 3px solid transparent; }
+a.hnp-reply:hover { background: var(--hnp-raised); }
+a.hnp-reply.unread { border-left-color: var(--hnp-accent); background: var(--hnp-accent-soft); }
+a.hnp-reply .hnp-reply-meta { font-size: 12px; color: var(--hnp-muted); }
+a.hnp-reply .hnp-reply-meta b { color: var(--hnp-text); font-weight: 650; }
+a.hnp-reply .hnp-reply-text { margin-top: 2px; color: var(--hnp-text); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+a.hnp-reply .hnp-reply-on { font-size: 11.5px; color: var(--hnp-muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hnp-acct-empty { padding: 8px 14px 12px; color: var(--hnp-muted); font-size: 12.5px; }
+.hnp-acct-links { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; padding: 8px; border-top: 1px solid var(--hnp-border); background: var(--hnp-bg); flex: none; }
+.hnp-acct-links a:link, .hnp-acct-links a:visited { display: flex; align-items: baseline; gap: 6px; padding: 6px 10px; border-radius: 7px; color: var(--hnp-dim); }
+.hnp-acct-links a:hover { background: var(--hnp-raised); color: var(--hnp-accent); }
+.hnp-acct-links .hnp-acct-pair { grid-column: span 2; display: flex; align-items: baseline; padding: 6px 10px; gap: 6px; color: var(--hnp-muted); }
+.hnp-acct-links .hnp-acct-pair > span:first-child { min-width: 72px; }
+.hnp-acct-links .hnp-acct-pair a:link, .hnp-acct-links .hnp-acct-pair a:visited { display: inline; padding: 0; color: var(--hnp-dim); }
+.hnp-acct-links .hnp-acct-pair a:hover { background: none; color: var(--hnp-accent); }
+.hnp-acct-links .hnp-acct-pair > span:first-child { color: var(--hnp-dim); }
+.hnp-acct-links a.hnp-acct-logout:link, .hnp-acct-links a.hnp-acct-logout:visited { color: var(--hnp-muted); }
+
 /* ---------- image expand ---------- */
 html.hnp .hnp-imgbtn { cursor: pointer; font-size: .78em; font-weight: 700; margin-left: 4px; padding: 0 5px; border-radius: 4px; color: var(--hnp-muted); border: 1px solid var(--hnp-border); background: none; font-family: var(--hnp-mono); }
 html.hnp .hnp-imgbtn:hover, html.hnp .hnp-imgbtn.on { color: var(--hnp-accent); border-color: var(--hnp-accent); }
@@ -670,6 +704,202 @@ html.hnp .pagetop a.hnp-gear:link, html.hnp .pagetop a.hnp-gear:visited { color:
   /* =====================================================================
    * Header & toast
    * ===================================================================== */
+
+  /* =====================================================================
+   * Account menu & reply tracking
+   * Replies come from the official API: your most recent submissions (stories
+   * and comments) are scanned for direct children you haven't seen yet.
+   * ===================================================================== */
+
+  const REPLY_SCAN = 30;              // how many of your latest items to scan
+  const REPLY_KEEP = 40;              // newest replies kept for the menu
+  const REPLY_REFRESH = 3 * 60 * 1000;
+  let REPLIES = null;                 // { user, checked, items: [...], seen: [ids] }
+  let replyScan = null;               // in-flight scan promise
+  let acctEl = null, acctTimer = 0, acctHideTimer = 0;
+
+  const loadReplies = () => {
+    const st = gmGet('replies', null);
+    return st && st.user === PAGE.me ? st : null;
+  };
+  const unreadReplies = () => (REPLIES ? REPLIES.items.filter((r) => !REPLIES.seen.includes(r.id)) : []);
+
+  function plainText(html, max = 220) {
+    const t = new DOMParser().parseFromString(`<div>${(html || '').replace(/<p>/gi, ' ')}</div>`, 'text/html').body.textContent.replace(/\s+/g, ' ').trim();
+    return t.length > max ? `${t.slice(0, max - 1)}…` : t;
+  }
+
+  async function mapPool(list, limit, fn) {
+    const out = new Array(list.length);
+    let next = 0;
+    const worker = async () => {
+      while (next < list.length) {
+        const i = next++;
+        try { out[i] = await fn(list[i]); } catch { out[i] = null; }
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(limit, list.length) }, worker));
+    return out;
+  }
+
+  function markRepliesSeen(ids) {
+    if (!REPLIES || !ids.length) return;
+    const seen = new Set(REPLIES.seen);
+    let changed = false;
+    for (const id of ids) if (!seen.has(id)) { seen.add(id); changed = true; }
+    if (!changed) return;
+    REPLIES.seen = [...seen].sort((a, b) => b - a).slice(0, 1000);
+    gmSet('replies', REPLIES);
+    renderReplyBadge();
+  }
+
+  function scanReplies(force) {
+    if (!PAGE.me || !S.replyTracking) return Promise.resolve();
+    const cached = loadReplies();
+    if (cached) REPLIES = cached;
+    if (!force && cached && Date.now() - cached.checked < REPLY_REFRESH) { afterReplies(); return Promise.resolve(); }
+    if (replyScan) return replyScan;
+    replyScan = (async () => {
+      const me = PAGE.me;
+      const user = await api(`user/${encodeURIComponent(me)}`, true);
+      const mine = (user?.submitted || []).slice(0, REPLY_SCAN);
+      const parents = (await mapPool(mine, 8, (id) => api(`item/${id}`, true))).filter((it) => it && !it.deleted && !it.dead);
+      const parentById = new Map(parents.map((it) => [it.id, it]));
+      const kidIds = [...new Set(parents.flatMap((it) => it.kids || []))].sort((a, b) => b - a).slice(0, REPLY_KEEP);
+      const known = new Map((cached?.items || []).map((r) => [r.id, r]));
+      const fresh = await mapPool(kidIds.filter((id) => !known.has(id)), 8, (id) => api(`item/${id}`));
+      const fetched = new Map(fresh.filter(Boolean).map((it) => [it.id, it]));
+      const items = [];
+      for (const id of kidIds) {
+        if (known.has(id)) { items.push(known.get(id)); continue; }
+        const it = fetched.get(id);
+        if (!it || it.deleted || it.dead || it.by === me) continue;
+        const parent = parentById.get(it.parent);
+        items.push({
+          id: it.id, by: it.by, time: it.time, parent: it.parent,
+          text: plainText(it.text),
+          on: parent ? (parent.title || plainText(parent.text, 90)) : '',
+        });
+      }
+      // First scan ever: treat what already exists as read, so you only hear about new replies.
+      const seen = cached ? cached.seen : items.map((r) => r.id);
+      REPLIES = { user: me, checked: Date.now(), items, seen };
+      gmSet('replies', REPLIES);
+      afterReplies();
+    })().catch((e) => console.warn('[hn+] reply scan failed', e)).finally(() => { replyScan = null; });
+    return replyScan;
+  }
+
+  function afterReplies() {
+    // Replies already visible on this page count as read.
+    if (REPLIES) markRepliesSeen(REPLIES.items.filter((r) => document.getElementById(String(r.id))?.classList.contains('hnp-c')).map((r) => r.id));
+    renderReplyBadge();
+    if (acctEl) renderAccountMenu();
+  }
+
+  function renderReplyBadge() {
+    const me = $('#me');
+    if (!me) return;
+    let badge = $('.hnp-replybadge');
+    const n = S.replyTracking ? unreadReplies().length : 0;
+    if (!n) { badge?.remove(); return; }
+    if (!badge) {
+      badge = h('a', { class: 'hnp-replybadge', href: '#', title: 'New replies to you' });
+      badge.addEventListener('click', (e) => { e.preventDefault(); openAccountMenu(me); });
+      me.after(badge);
+    }
+    badge.textContent = String(n);
+    badge.title = `${n} new repl${n === 1 ? 'y' : 'ies'} to you`;
+  }
+
+  function renderAccountMenu() {
+    const meLink = $('#me');
+    if (!acctEl || !meLink) return;
+    const me = PAGE.me;
+    const enc = encodeURIComponent(me);
+    const karma = $('#karma')?.textContent.trim();
+    const logout = $('#logout')?.getAttribute('href');
+    const unread = new Set(unreadReplies().map((r) => r.id));
+
+    const refresh = h('button', { type: 'button', title: 'Check for replies now' }, replyScan ? 'checking…' : 'refresh');
+    refresh.addEventListener('click', () => { scanReplies(true); renderAccountMenu(); });
+    const readAll = h('button', { type: 'button', title: 'Mark every reply as read' }, 'mark read');
+    readAll.addEventListener('click', () => { markRepliesSeen([...unread]); renderAccountMenu(); });
+
+    const head = h('div', { class: 'hnp-acct-head' },
+      h('b', {}, me),
+      karma && h('span', { class: 'hnp-card-karma' }, `${karma} karma`),
+      h('span', { class: 'hnp-acct-tools' }, S.replyTracking && unread.size ? readAll : null, S.replyTracking ? refresh : null));
+
+    let replies = null;
+    if (S.replyTracking) {
+      const list = REPLIES?.items || [];
+      replies = h('div', { class: 'hnp-acct-replies' },
+        h('div', { class: 'hnp-acct-label' }, 'Replies to you', unread.size ? h('span', {}, `${unread.size} new`) : null),
+        !REPLIES ? h('div', { class: 'hnp-acct-empty' }, 'Checking your recent comments for replies…')
+          : !list.length ? h('div', { class: 'hnp-acct-empty' }, `No replies to your last ${REPLY_SCAN} posts yet.`)
+            : list.map((r) => {
+              const a = h('a', { class: `hnp-reply${unread.has(r.id) ? ' unread' : ''}`, href: `item?id=${r.parent}#${r.id}` },
+                h('div', { class: 'hnp-reply-meta' }, h('b', {}, USERS[r.by]?.alias || r.by), ` · ${timeAgo(r.time)}`),
+                h('div', { class: 'hnp-reply-text' }, swapString(r.text)),
+                r.on && h('div', { class: 'hnp-reply-on' }, `on: ${r.on}`));
+              a.addEventListener('click', () => markRepliesSeen([r.id]));
+              return a;
+            }));
+    }
+
+    const link = (href, label) => h('a', { href }, label);
+    const pair = (label, a, b) => h('div', { class: 'hnp-acct-pair' }, h('span', {}, label), a, '·', b);
+    const links = h('div', { class: 'hnp-acct-links' },
+      link(`user?id=${enc}`, 'Profile'),
+      link(`threads?id=${enc}`, 'Comments'),
+      link(`submitted?id=${enc}`, 'Submissions'),
+      link('hidden', 'Hidden'),
+      pair('Upvoted', link(`upvoted?id=${enc}`, 'stories'), link(`upvoted?id=${enc}&comments=t`, 'comments')),
+      pair('Favorites', link(`favorites?id=${enc}`, 'stories'), link(`favorites?id=${enc}&comments=t`, 'comments')),
+      link(`flagged?id=${enc}`, 'Flagged'),
+      link('changepw', 'Change password'),
+      logout && h('a', { class: 'hnp-acct-logout', href: logout }, 'Log out'));
+
+    acctEl.replaceChildren(head, replies, links);
+  }
+
+  function openAccountMenu(anchor) {
+    if (!S.accountMenu || !PAGE.me) return;
+    clearTimeout(acctHideTimer);
+    if (acctEl) return;
+    acctEl = h('div', { class: 'hnp-ui hnp-card hnp-acct' });
+    acctEl.addEventListener('mouseenter', () => clearTimeout(acctHideTimer));
+    acctEl.addEventListener('mouseleave', () => { acctHideTimer = setTimeout(closeAccountMenu, 300); });
+    renderAccountMenu();
+    document.body.append(acctEl);
+    const r = anchor.getBoundingClientRect();
+    const header = $('#hnmain > tbody > tr:first-child > td')?.getBoundingClientRect();
+    acctEl.style.top = `${Math.max(r.bottom, header ? header.bottom : r.bottom) + 6}px`;
+    acctEl.style.left = `${Math.max(8, Math.min(r.right - acctEl.offsetWidth + 40, window.innerWidth - acctEl.offsetWidth - 8))}px`;
+    if (S.replyTracking && (!REPLIES || Date.now() - REPLIES.checked > 60 * 1000)) scanReplies(true).then(() => acctEl && renderAccountMenu());
+  }
+
+  function closeAccountMenu() {
+    acctEl?.remove();
+    acctEl = null;
+  }
+
+  function setupAccount() {
+    const me = $('#me');
+    if (!me || !PAGE.me) return;
+    const enter = () => { clearTimeout(acctHideTimer); clearTimeout(acctTimer); acctTimer = setTimeout(() => openAccountMenu(me), 120); };
+    const leave = () => { clearTimeout(acctTimer); acctHideTimer = setTimeout(closeAccountMenu, 300); };
+    me.addEventListener('mouseenter', enter);
+    me.addEventListener('mouseleave', leave);
+    document.addEventListener('mousedown', (e) => {
+      if (acctEl && !(e.target instanceof Element && e.target.closest('.hnp-acct, #me, .hnp-replybadge'))) closeAccountMenu();
+    });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeAccountMenu(); });
+    scanReplies(false);
+    setInterval(() => { if (document.visibilityState === 'visible') scanReplies(false); }, 60 * 1000);
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') scanReplies(false); });
+  }
 
   function enhanceHeader() {
     const tops = $$('#hnmain > tbody > tr:first-child .pagetop');
@@ -1401,6 +1631,8 @@ html.hnp .pagetop a.hnp-gear:link, html.hnp .pagetop a.hnp-gear:visited { color:
     applyNewTab();
     applyFavicons();
     applySwaps();
+    renderReplyBadge();
+    if (!S.accountMenu) closeAccountMenu();
   }
 
   function set(key, value) {
@@ -1532,6 +1764,9 @@ html.hnp .pagetop a.hnp-gear:link, html.hnp .pagetop a.hnp-gear:visited { color:
         section('Hover',
           toggle('hoverPreviews', 'Comment & item previews', 'Hover "parent", "context" and item links to preview them'),
           toggle('userCards', 'User cards', 'Hover a username for karma, about and quick highlight/tag/mute')),
+        section('Account (when logged in)',
+          toggle('accountMenu', 'Account menu', 'Hover your username for replies, comments, upvoted, favorites and more'),
+          toggle('replyTracking', 'Reply tracking', `Checks your last ${REPLY_SCAN} posts for new replies every few minutes and shows a count next to your name`)),
       ];
     },
 
@@ -1685,6 +1920,7 @@ html.hnp .pagetop a.hnp-gear:link, html.hnp .pagetop a.hnp-gear:visited { color:
     setupHover();
     setupKeyboard();
     setupFab();
+    setupAccount();
     // Location hash (e.g. arriving from a "context" link): select that comment.
     const hashRow = location.hash ? document.getElementById(location.hash.slice(1)) : null;
     if (hashRow?.classList.contains('hnp-c')) select(hashRow, false);
