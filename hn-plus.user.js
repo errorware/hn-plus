@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         HN+
 // @namespace    https://github.com/errorware/hn-plus
-// @version      0.3.0
+// @version      0.3.1
 // @description  A dark, configurable power-user layer for Hacker News.
 // @homepageURL  https://github.com/errorware/hn-plus
 // @supportURL   https://github.com/errorware/hn-plus/issues
@@ -15,12 +15,15 @@
 // @grant        GM_registerMenuCommand
 // @grant        GM_xmlhttpRequest
 // @connect      hacker-news.firebaseio.com
+// @connect      cdn.jsdelivr.net
+// @connect      icons.duckduckgo.com
+// @connect      *
 // ==/UserScript==
 
 (() => {
   'use strict';
 
-  const VERSION = '0.3.0';
+  const VERSION = '0.3.1';
   const API = 'https://hacker-news.firebaseio.com/v0';
 
   /* =====================================================================
@@ -50,7 +53,7 @@
   const FONTS = {
     sans:    { label: 'Sans',    stack: 'system-ui, -apple-system, "Segoe UI", Inter, Roboto, "Helvetica Neue", Arial, sans-serif' },
     serif:   { label: 'Serif',   stack: '"Iowan Old Style", Charter, "Source Serif 4", "Source Serif Pro", Georgia, "Times New Roman", serif' },
-    mono:    { label: 'Mono',    stack: '"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace' },
+    mono:    { label: 'Mono',    stack: '"JetBrains Mono", "HNP JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace' },
     classic: { label: 'Verdana', stack: 'Verdana, Geneva, sans-serif' },
   };
   const MONO_STACK = FONTS.mono.stack;
@@ -308,7 +311,7 @@ html.hnp tr.athing.submission > td, html.hnp tr.hnp-sub > td { transition: backg
 html.hnp tr.athing.submission.hnp-sel > td, html.hnp tr.athing.submission.hnp-sel + tr > td { background: var(--hnp-surface) !important; }
 html.hnp tr.athing.hnp-sel > td:first-child { box-shadow: inset 3px 0 0 var(--hnp-accent); }
 html.hnp.hnp-dimread tr.athing.hnp-read .titleline > a:link { color: var(--hnp-muted) !important; }
-html.hnp .hnp-fav { width: 14px; height: 14px; vertical-align: -2px; margin-right: 6px; border-radius: 3px; }
+html.hnp .hnp-fav { display: inline-block; width: 14px; height: 14px; vertical-align: -2px; margin-right: 6px; border-radius: 3px; }
 html.hnp .hnp-newcount { color: var(--hnp-ink); background: var(--hnp-accent); border-radius: 999px; padding: 0 6px; margin-left: 4px; font-weight: 700; font-size: .9em; }
 html:not(.hnp-newcounts) .hnp-newcount { display: none; }
 html.hnp tr.hnp-filtered { display: none !important; }
@@ -489,7 +492,8 @@ a.hnp-reply .hnp-reply-on { font-size: 11.5px; color: var(--hnp-muted); margin-t
 html.hnp .hnp-imgbtn { cursor: pointer; font-size: .78em; font-weight: 700; margin-left: 4px; padding: 0 5px; border-radius: 4px; color: var(--hnp-muted); border: 1px solid var(--hnp-border); background: none; font-family: var(--hnp-mono); }
 html.hnp .hnp-imgbtn:hover, html.hnp .hnp-imgbtn.on { color: var(--hnp-accent); border-color: var(--hnp-accent); }
 html:not(.hnp-images) .hnp-imgbtn { display: none; }
-html.hnp .hnp-img { display: block; max-width: min(100%, 640px); max-height: 70vh; margin: 8px 0; border-radius: 8px; border: 1px solid var(--hnp-border); cursor: zoom-out; }
+html.hnp .hnp-img-msg { display: block; padding: 6px 0; color: var(--hnp-muted); font-size: var(--hnp-fs-small); border: 0 !important; cursor: default !important; }
+html.hnp .hnp-img { display: block; height: auto; max-width: min(100%, 640px); max-height: 70vh; margin: 8px 0; border-radius: 8px; border: 1px solid var(--hnp-border); cursor: zoom-out; }
 
 /* ---------- HN+ UI ---------- */
 .hnp-ui, .hnp-ui * { box-sizing: border-box; }
@@ -640,13 +644,73 @@ html.hnp .pagetop a.hnp-gear:link, html.hnp .pagetop a.hnp-gear:visited { color:
     return st;
   }
 
-  function ensureFontLink() {
-    if (document.getElementById('hnp-fontlink')) return;
-    const l = document.createElement('link');
-    l.id = 'hnp-fontlink';
-    l.rel = 'stylesheet';
-    l.href = 'https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,700;1,400&display=swap';
-    (document.head || document.documentElement).append(l);
+  /* ---- binary fetches (GM_xmlhttpRequest is not subject to the page's CSP) ---- */
+
+  function gmBinary(url) {
+    return new Promise((resolve, reject) => {
+      if (typeof GM_xmlhttpRequest === 'function') {
+        GM_xmlhttpRequest({
+          method: 'GET', url, responseType: 'arraybuffer', timeout: 15000,
+          onload: (r) => (r.status >= 200 && r.status < 300 && r.response ? resolve(r.response) : reject(new Error(`HTTP ${r.status}`))),
+          onerror: reject, ontimeout: reject,
+        });
+      } else {
+        fetch(url).then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(`HTTP ${r.status}`)))).then(resolve, reject);
+      }
+    });
+  }
+
+  function bufToB64(buf) {
+    const bytes = new Uint8Array(buf);
+    let bin = '';
+    for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    return btoa(bin);
+  }
+  function b64ToBuf(b64) {
+    const bin = atob(b64);
+    const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out.buffer;
+  }
+
+  // JetBrains Mono, registered from bytes: HN's CSP blocks font stylesheets and font URLs,
+  // but a FontFace built from an ArrayBuffer involves no request at all. Downloaded once,
+  // then kept in userscript storage. A locally installed "JetBrains Mono" still wins.
+  const MONO_FILES = {
+    400: 'https://cdn.jsdelivr.net/fontsource/fonts/jetbrains-mono@latest/latin-400-normal.woff2',
+    700: 'https://cdn.jsdelivr.net/fontsource/fonts/jetbrains-mono@latest/latin-700-normal.woff2',
+  };
+  let monoRequested = false;
+  function loadMonoFont() {
+    if (monoRequested || typeof FontFace !== 'function' || !document.fonts) return;
+    monoRequested = true;
+    for (const [weight, url] of Object.entries(MONO_FILES)) {
+      (async () => {
+        const key = `font:jetbrains-mono:${weight}`;
+        let b64 = gmGet(key, null);
+        if (!b64) { b64 = bufToB64(await gmBinary(url)); gmSet(key, b64); }
+        const face = new FontFace('HNP JetBrains Mono', b64ToBuf(b64), { weight, style: 'normal', display: 'swap' });
+        document.fonts.add(await face.load());
+      })().catch((e) => console.warn('[hn+] could not load JetBrains Mono', e));
+    }
+  }
+
+  // Remote images drawn onto <canvas>: CSP img-src doesn't apply to canvas pixels.
+  const bitmapCache = new Map();
+  function remoteBitmap(url) {
+    if (!bitmapCache.has(url)) {
+      const p = gmBinary(url).then((buf) => createImageBitmap(new Blob([buf])));
+      p.catch(() => bitmapCache.delete(url));
+      bitmapCache.set(url, p);
+    }
+    return bitmapCache.get(url);
+  }
+  function bitmapCanvas(bmp, cls) {
+    const c = h('canvas', { class: cls });
+    c.width = bmp.width;
+    c.height = bmp.height;
+    c.getContext('2d').drawImage(bmp, 0, 0);
+    return c;
   }
 
   /* =====================================================================
@@ -660,16 +724,25 @@ html.hnp .pagetop a.hnp-gear:link, html.hnp .pagetop a.hnp-gear:visited { color:
     return d.getMonth() === 11 || (d.getMonth() === 0 && d.getDate() <= 6);
   }
 
-  const svgUrl = (svg) => `url("data:image/svg+xml,${encodeURIComponent(svg.replace(/\s+/g, ' ').trim())}")`;
+  // Inline <svg> elements (HN's CSP blocks data: images, so no CSS url() here).
+  const svgCache = new Map();
+  function svgEl(markup) {
+    let el = svgCache.get(markup);
+    if (!el) {
+      el = new DOMParser().parseFromString(markup.replace(/\s+/g, ' ').trim(), 'image/svg+xml').documentElement;
+      svgCache.set(markup, el);
+    }
+    return document.importNode(el, true);
+  }
   const X_RED = '#e5383b', X_GREEN = '#22a559', X_GOLD = '#fbbf24', X_SNOW = '#f8f8f8';
 
-  const SANTA_HAT = svgUrl(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 28">
+  const SANTA_HAT = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 28">
     <path d="M5 21 C7 11 14 4 25 5 C27 5.3 28.5 6.5 28 8 C24 9 21.5 14 23 21 Z" fill="${X_RED}"/>
     <path d="M14 8 C18 5.5 22 5 25 5.4 C21.5 6.5 18.5 9 17 12 Z" fill="#ff6b6b" opacity=".55"/>
     <rect x="2" y="18.5" width="24" height="7.5" rx="3.75" fill="${X_SNOW}"/>
     <rect x="4" y="19.5" width="20" height="2" rx="1" fill="#ffffff"/>
     <circle cx="28" cy="8.5" r="3.6" fill="${X_SNOW}"/>
-  </svg>`);
+  </svg>`;
 
   const ORNAMENTS = {
     holly: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">
@@ -705,24 +778,23 @@ html.hnp .pagetop a.hnp-gear:link, html.hnp .pagetop a.hnp-gear:visited { color:
       <path d="M6.6 1.2 L8 2.6 L9.4 1.2" fill="none" stroke="${X_GREEN}" stroke-width="1.1"/>
     </svg>`,
   };
-  // start / end ornament per row, cycled by data-hnp-xo
+  // start / end ornament per row, cycled down the page
   const ORNAMENT_PAIRS = [['holly', 'bauble'], ['star', 'gift'], ['cane', 'bell'], ['bauble', 'holly'], ['gift', 'star'], ['bell', 'cane']];
 
   const XMAS_CSS = `
 /* Santa hats */
 html.hnp-xmas-hats a.hnp-user, html.hnp-xmas-hats #me { position: relative; margin-right: 5px; }
-html.hnp-xmas-hats a.hnp-user::after, html.hnp-xmas-hats #me::after {
-  content: ""; position: absolute; right: -11px; top: -.85em; width: 1.45em; height: 1.25em; pointer-events: none;
-  background: ${SANTA_HAT} no-repeat center / contain; transform: rotate(22deg); filter: drop-shadow(0 1px 1px rgba(0,0,0,.45));
+.hnp-hat {
+  display: none; position: absolute; right: -11px; top: -.85em; width: 1.45em; height: 1.25em; pointer-events: none;
+  transform: rotate(22deg); filter: drop-shadow(0 1px 1px rgba(0,0,0,.45));
 }
+html.hnp-xmas-hats .hnp-hat { display: block; }
+.hnp-hat svg, .hnp-orn svg { display: block; width: 100%; height: 100%; }
 /* Title ornaments */
-html.hnp-xmas-orn .titleline::before, html.hnp-xmas-orn .titleline > a::after {
-  content: ""; display: inline-block; width: 1em; height: 1em; vertical-align: -.14em; background: no-repeat center / contain;
-}
-html.hnp-xmas-orn .titleline::before { margin-right: .4em; }
-html.hnp-xmas-orn .titleline > a::after { margin-left: .4em; }
-${ORNAMENT_PAIRS.map(([a, b], i) => `html.hnp-xmas-orn .titleline[data-hnp-xo="${i}"]::before { background-image: ${svgUrl(ORNAMENTS[a])}; }
-html.hnp-xmas-orn .titleline[data-hnp-xo="${i}"] > a::after { background-image: ${svgUrl(ORNAMENTS[b])}; }`).join('\n')}
+.hnp-orn { display: none; width: 1em; height: 1em; vertical-align: -.14em; }
+html.hnp-xmas-orn .hnp-orn { display: inline-block; }
+.hnp-orn-a { margin-right: .4em; }
+.hnp-orn-b { margin-left: .4em; }
 /* Fairy lights under the header */
 html.hnp-xmas-lights #hnmain > tbody > tr:first-child > td { position: relative; }
 html.hnp-xmas-lights #hnmain > tbody > tr:first-child > td::before,
@@ -825,7 +897,25 @@ html.hnp-xmas-lights #hnmain > tbody > tr:first-child > td::after {
   function applyXmas() {
     if (!document.body) return;
     if (isXmas() && S.xmasSnow) startSnow(); else stopSnow();
-    $$('.titleline').forEach((t, i) => { if (t.dataset.hnpXo == null) t.dataset.hnpXo = String(i % ORNAMENT_PAIRS.length); });
+    decorateXmas();
+  }
+
+  function decorateXmas() {
+    if (!document.body || !isXmas()) return;
+    if (S.xmasHats) {
+      for (const a of $$('a.hnp-user, #me')) {
+        if (!a.querySelector(':scope > .hnp-hat')) a.append(h('span', { class: 'hnp-hat', 'aria-hidden': 'true' }, svgEl(SANTA_HAT)));
+      }
+    }
+    if (S.xmasOrnaments) {
+      $$('.titleline').forEach((t, i) => {
+        const link = t.querySelector(':scope > a');
+        if (!link || t.querySelector(':scope > .hnp-orn')) return;
+        const [first, last] = ORNAMENT_PAIRS[i % ORNAMENT_PAIRS.length];
+        t.prepend(h('span', { class: 'hnp-orn hnp-orn-a', 'aria-hidden': 'true' }, svgEl(ORNAMENTS[first])));
+        link.after(h('span', { class: 'hnp-orn hnp-orn-b', 'aria-hidden': 'true' }, svgEl(ORNAMENTS[last])));
+      });
+    }
   }
 
   const HTML_FLAGS = {
@@ -856,7 +946,7 @@ html.hnp-xmas-lights #hnmain > tbody > tr:first-child > td::after {
     mountStyle('hnp-base', CSS_BASE);
     mountStyle('hnp-vars', themeVars());
     mountStyle('hnp-xmas', XMAS_CSS);
-    ensureFontLink();
+    loadMonoFont();
     applyXmas();
   }
 
@@ -1147,7 +1237,11 @@ html.hnp-xmas-lights #hnmain > tbody > tr:first-child > td::after {
       if (existing || !a || !/^https?:/i.test(a.getAttribute('href') || '')) continue;
       let host;
       try { host = new URL(a.href).hostname; } catch { continue; }
-      a.before(h('img', { class: 'hnp-fav', src: `https://icons.duckduckgo.com/ip3/${host}.ico`, alt: '', loading: 'lazy', referrerpolicy: 'no-referrer', onerror: (e) => e.target.remove() }));
+      const slot = h('span', { class: 'hnp-fav', 'aria-hidden': 'true' });
+      a.before(slot);
+      remoteBitmap(`https://icons.duckduckgo.com/ip3/${host}.ico`)
+        .then((bmp) => slot.isConnected && slot.replaceWith(bitmapCanvas(bmp, 'hnp-fav')))
+        .catch(() => slot.remove());
     }
   }
 
@@ -1242,10 +1336,16 @@ html.hnp-xmas-lights #hnmain > tbody > tr:first-child > td::after {
         e.preventDefault();
         const next = btn.nextElementSibling;
         if (next?.classList.contains('hnp-img')) { next.remove(); btn.classList.remove('on'); return; }
-        const img = h('img', { class: 'hnp-img', src: a.href, alt: '', referrerpolicy: 'no-referrer', title: 'Click to hide' });
-        img.addEventListener('click', () => { img.remove(); btn.classList.remove('on'); });
-        btn.after(img);
+        const slot = h('span', { class: 'hnp-img hnp-img-msg' }, 'loading image…');
+        btn.after(slot);
         btn.classList.add('on');
+        remoteBitmap(a.href).then((bmp) => {
+          if (!slot.isConnected) return;
+          const c = bitmapCanvas(bmp, 'hnp-img');
+          c.title = 'Click to hide';
+          c.addEventListener('click', () => { c.remove(); btn.classList.remove('on'); });
+          slot.replaceWith(c);
+        }).catch(() => { slot.textContent = 'couldn’t load this image'; });
       });
       a.after(btn);
     }
@@ -1436,6 +1536,7 @@ html.hnp-xmas-lights #hnmain > tbody > tr:first-child > td::after {
         }
       }
     }
+    decorateXmas();
   }
 
   function updateUser(name, patch) {

@@ -54,9 +54,11 @@ HN+ is a single userscript. It gives Hacker News a deep dark theme with an accen
 
 Everything you set stays in your userscript manager's local storage. Besides HN itself, the script connects only to:
 - the official [HN API](https://github.com/HackerNews/API), for hover cards and reply checks (your last 30 posts, every few minutes, only while logged in)
-- Google Fonts, for JetBrains Mono
+- jsDelivr, once, to download JetBrains Mono (it's then stored locally)
 - DuckDuckGo's icon service, only if site icons are on
 - image hosts, only when you expand an image
+
+HN sends a strict Content Security Policy to logged-in users, so HN+ never loads outside images or stylesheets into the page. Decorations are inline SVG, fonts are registered from stored bytes, and favicons and inline images are drawn on a canvas. Tampermonkey may ask once before an expanded image loads from a new site.
 
 ## Development
 

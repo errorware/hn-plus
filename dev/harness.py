@@ -13,12 +13,14 @@ Add ?demo to any page to seed sample state (users, a word swap, NEW
 comments); ?demo=settings also opens the settings panel and ?demo=card
 opens a user hover card. Used for the README screenshots.
 Add ?me=<username> to fake being logged in as that user (account menu, replies).
+Pages are served with HN's logged-in Content-Security-Policy; add ?csp=0 to drop it.
 """
 import http.server
 import json
 import os
 import re
 import sys
+import urllib.error
 import urllib.request
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -27,10 +29,24 @@ SCRIPT = os.path.join(ROOT, '..', 'hn-plus.user.js')
 HN = 'https://news.ycombinator.com'
 PORT = 8765
 
+# Mirrors the Content-Security-Policy HN sends to logged-in users, so anything the
+# real site would block is blocked here too. GM_xmlhttpRequest is emulated through
+# /__proxy (like Tampermonkey, it ignores the page's CSP and CORS).
+CSP = ("default-src 'self'; "
+       "script-src 'self' 'unsafe-inline' https://news.ycombinator.com; "
+       "style-src 'self' 'unsafe-inline' https://news.ycombinator.com; "
+       "img-src 'self' https://news.ycombinator.com https://account.ycombinator.com; "
+       "font-src 'self'; "
+       "connect-src 'self'")
+
 SHIM = """<script>
 window.GM_getValue=(k)=>{const v=localStorage.getItem('gm_'+k);return v==null?undefined:JSON.parse(v)};
 window.GM_setValue=(k,v)=>localStorage.setItem('gm_'+k,JSON.stringify(v));
 window.GM_registerMenuCommand=()=>{};
+window.GM_xmlhttpRequest=(o)=>{fetch('/__proxy?url='+encodeURIComponent(o.url)).then(async(r)=>{
+  const t=o.responseType, body=t==='arraybuffer'?await r.arrayBuffer():t==='json'?await r.json().catch(()=>null):await r.text();
+  o.onload&&o.onload({status:r.status,response:body,responseText:typeof body==='string'?body:''});
+}).catch((e)=>o.onerror&&o.onerror(e));};
 window.onerror=(m,s,l,c)=>{(window.__errs=window.__errs||[]).push(m+' @'+l+':'+c)};
 </script><script src="/__hnp.js"></script>"""
 
@@ -96,6 +112,24 @@ def demo_script(mode):
 class Handler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
         path = self.path.split('?')[0]
+        if path == '/__proxy':
+            from urllib.parse import parse_qs, urlparse
+            url = parse_qs(urlparse(self.path).query).get('url', [''])[0]
+            if not url.startswith('https://'):
+                self.send_response(400); self.end_headers(); return
+            try:
+                req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 hn-plus-dev-harness'})
+                with urllib.request.urlopen(req, timeout=20) as r:
+                    body, ctype, status = r.read(), r.headers.get('Content-Type', 'application/octet-stream'), r.status
+            except urllib.error.HTTPError as e:
+                body, ctype, status = b'', 'text/plain', e.code
+            except Exception:
+                body, ctype, status = b'', 'text/plain', 502
+            self.send_response(status)
+            self.send_header('Content-Type', ctype)
+            self.end_headers()
+            self.wfile.write(body)
+            return
         if path == '/__hnp.js':
             body, ctype = open(SCRIPT, 'rb').read(), 'application/javascript'
         elif path in PAGES:
@@ -113,6 +147,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             for attr, asset in (('href', 'news.css'), ('src', 'hn.js'), ('src', 'y18.svg'), ('src', 's.gif')):
                 html = html.replace(f'{attr}="{asset}', f'{attr}="{HN}/{asset}')
             body, ctype = html.encode(), 'text/html; charset=utf-8'
+            self.csp = 'csp=0' not in self.path
         else:
             self.send_response(404)
             self.end_headers()
@@ -120,6 +155,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header('Content-Type', ctype)
         self.send_header('Cache-Control', 'no-store')
+        if getattr(self, 'csp', False):
+            self.send_header('Content-Security-Policy', CSP)
         self.end_headers()
         self.wfile.write(body)
 
